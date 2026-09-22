@@ -13,7 +13,7 @@ const LANE = { motorway: 4.5, trunk: 3.6, primary: 3.2, secondary: 2.8, tertiary
  * car is two pixels and the streets read as empty, so they are scaled the way
  * a tabletop layout scales its figures: big enough to see, small enough to
  * still look like traffic. */
-const VEHICLE_SCALE = 1.75, PED_SCALE = 2.6;
+const VEHICLE_SCALE = 2.35, PED_SCALE = 3.6;
 const CAR_COLORS = ['#e8443c','#f0a12c','#2f7fd4','#f2e04a','#e8ede8','#38b06a','#2a2f38','#d8562c',
                     '#7a4ecc','#26b4c4','#f07ab0','#c9ced6','#8a5a34','#1f4f9c'];
 const HORSE_COLORS = ['#6b4a2e','#4a3320','#8a6642','#3a2a1c'];

@@ -251,7 +251,7 @@ makeComposer(); setSun(); markView(); frame(); syncYear();
 setTimeline(Q.has('pop') ? false : true);
 $('load').classList.add('gone');
 
-window.atx = { scene, city, life, rig, model, uniforms, get year() { return year; }, set year(v) { year = v; $('yr').value = v; syncYear(); } };
+window.atx = { scene, city, life, rig, model, uniforms, renderer, lamps, trees, get year() { return year; }, set year(v) { year = v; $('yr').value = v; syncYear(); } };
 
 // ---------------------------------------------------------------- loop
 let last = performance.now(), acc = 0, fps = 60;

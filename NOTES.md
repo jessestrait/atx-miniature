@@ -89,3 +89,53 @@ than as a progress bar.
   1928 plan, to urban renewal, or to a condo tower is simply absent.
 - `actualYearBuilt` is a renovation-sensitive field. A gut remodel can reset it.
 - The inferred 560 are neighbourhood medians and will be wrong individually.
+
+## Windows without textures, 2026-09-22
+
+Facades are glazed in the fragment shader from world position. The wall's own
+tangent, `cross(up, N)`, is the horizontal facade coordinate and height above
+the building's base is the vertical one, so every elevation of every building
+gets a pane grid with no UVs, no atlas and no extra geometry. Roofs are
+excluded by `abs(N.y) < 0.62`, the plinth and the parapet by a band test
+against the per-vertex base and top.
+
+Three things this needed before it looked right.
+
+- **Chunky panes.** A true 3.15 m column grid turned into static at model
+  distance. Bays of 5.4 m by 5.0 m survive the shrink. A model maker does the
+  same thing.
+- **Antialias against the derivative.** `fwidth` on the cell coordinate gives
+  the pane edges a real soft edge, and once a cell is smaller than a pixel the
+  whole grid is mixed toward its own average coverage. Without that last step
+  the towers shimmered whenever the camera moved.
+- **Daylight is a reflection, not a hole.** The first pass darkened panes hard
+  in all conditions and every facade read as a checkerboard. Glass is now a
+  faint cool tint by day and properly black behind the lit panes at night.
+
+At night a hash per cell decides what is lit, occupancy runs from 22% on a low
+building to 46% on a tower, and a slow term lets a few switch over while you
+watch.
+
+## The flash had to be gated
+
+Buildings flash warm for four years after they go up. Parked at 2026 that left
+every tower built since 2022 permanently glowing orange, which read as a
+rendering bug. It is now driven by a `uFlash` uniform that eases in only while
+a run is actually playing.
+
+## Performance, measured
+
+On this Intel Mac, steady state at 2026 with everything on:
+
+| | |
+|---|---|
+| scene render, median of 12 | 1.6 ms |
+| same without tree and lamp shadows | 0.8 ms |
+| life update (2,120 instance matrices) | 1.6 ms |
+
+The first render after an idle costs around 500 ms, which is a cold pipeline,
+not a frame cost — measure a median, not a first sample. Scene totals: 3,346
+buildings in one draw call, 5,938 trees, 1,178 lamps, 620 cars, 1,500 people.
+
+Note that a hidden browser tab stops `requestAnimationFrame` entirely, so any
+frame-rate measurement taken while the page is not visible reads zero.

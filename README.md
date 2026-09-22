@@ -8,6 +8,11 @@ blocks fill in. The palette moves from limestone through concrete to blue
 glass, horse traffic crossfades into cars through the 1910s, and people walk
 the sidewalks the whole way.
 
+Run the clock round to the evening and the city switches itself on: every
+facade is glazed, a third of the panes light up in tungsten, fluorescent and a
+little neon, headlights and tail lights come on, and the street lamps follow
+the grid out from the centre.
+
 Inspirations: the model-city establishing shots in *Game Night* and the BBC
 *Sherlock*, and the pop-up isometric city in the *Silicon Valley* title.
 
@@ -36,6 +41,7 @@ Open <http://localhost:8765>. No build step; three.js comes from jsDelivr.
 | `0`, **Frame** | reframe the whole model |
 | `Space` | play / pause the timeline |
 | `T` | timeline vs. pop-up reveal |
+| `N` | jump between midday and night |
 | `H` | hide the panel |
 
 **Play the film** runs the whole thing with a single scripted push-in, which is
@@ -46,8 +52,13 @@ slider is the aperture. **Isometric** is a true 35.264° orthographic view with 
 screen-space tilt-shift band instead, because the bokeh pass's maths is
 perspective-only.
 
-`?model=data/other.json` loads a different slice, `?light` halves the traffic
-and the shadow map, `?pop` opens on the pop-up reveal instead of the timeline.
+**Time** is the hour of the day, not a compass: it drives the sun's elevation
+and bearing together, with the sky, the exposure and the bloom. **Lit** toggles
+the window shader and **Trees** the planting.
+
+`?model=data/other.json` loads a different slice, `?light` halves the traffic,
+the lamps, the trees and the shadow map, `?pop` opens on the pop-up reveal
+instead of the timeline.
 
 ## Rebuild the data
 
@@ -111,8 +122,11 @@ it was built — not a reconstruction. See [NOTES.md](NOTES.md).
   and real bokeh. Blender is not on this Mac yet.
 - **Bigger slices.** The pipeline is bbox-driven. A whole-city extract at a
   coarser cell size is a different, wider shot.
-- **Night.** Window lights keyed to the era would carry the 1950s better than
-  anything else on this list.
+- **Windows keyed to the era.** They are the same grid in 1890 and 2026 today.
+  Smaller, denser panes before the war and a full curtain wall after would
+  carry the period better than anything else on this list.
+- **Neon and signage.** A handful of named buildings with their own lit signs
+  would do more for the night shot than any amount of extra glow.
 
 ## Data credits
 

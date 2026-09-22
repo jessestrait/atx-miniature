@@ -59,7 +59,7 @@ export function trafficAt(year) {
  * starts to rise before the sun is actually down, because windows come on at
  * dusk, not at darkness. */
 const DAY = [
-  { h: 4.0,  sky: '#1d2740', sun: '#3f5378', amb: '#141d33', I: 0.16, A: 0.46, night: 1.00 },
+  { h: 4.0,  sky: '#232f4c', sun: '#5470a4', amb: '#1e2b48', I: 0.26, A: 0.62, night: 1.00 },
   { h: 6.2,  sky: '#5d6a86', sun: '#c98d6a', amb: '#3a4560', I: 0.55, A: 0.55, night: 0.72 },
   { h: 7.5,  sky: '#b9bfc4', sun: '#ffd0a0', amb: '#8a8f9a', I: 1.45, A: 0.80, night: 0.28 },
   { h: 10.0, sky: '#d9e0e4', sun: '#fff0dc', amb: '#a8b0b8', I: 2.25, A: 0.95, night: 0.02 },
@@ -67,8 +67,8 @@ const DAY = [
   { h: 16.5, sky: '#e2ddd0', sun: '#ffeed4', amb: '#aca69a', I: 2.20, A: 0.95, night: 0.03 },
   { h: 18.6, sky: '#dcc0a2', sun: '#ffc384', amb: '#8f7f72', I: 1.35, A: 0.78, night: 0.34 },
   { h: 19.8, sky: '#9c7f83', sun: '#e2794f', amb: '#584c56', I: 0.62, A: 0.55, night: 0.72 },
-  { h: 21.0, sky: '#33405e', sun: '#5a6a92', amb: '#1e2740', I: 0.24, A: 0.50, night: 0.96 },
-  { h: 24.0, sky: '#1d2740', sun: '#3f5378', amb: '#141d33', I: 0.16, A: 0.46, night: 1.00 },
+  { h: 21.0, sky: '#39466a', sun: '#6478a6', amb: '#26334f', I: 0.32, A: 0.66, night: 0.96 },
+  { h: 24.0, sky: '#232f4c', sun: '#5470a4', amb: '#1e2b48', I: 0.26, A: 0.62, night: 1.00 },
 ];
 for (const d of DAY) { d.cSky = new THREE.Color(d.sky); d.cSun = new THREE.Color(d.sun); d.cAmb = new THREE.Color(d.amb); }
 

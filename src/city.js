@@ -297,7 +297,7 @@ export class City {
             vec2 pa = smoothstep(lo - w, lo + w, f) * (1.0 - smoothstep(hi - w, hi + w, f));
             float pane = pa.x * pa.y;
             float cover = (hi.x - lo.x) * (hi.y - lo.y);
-            float detail = 1.0 - smoothstep(0.18, 0.55, max(w.x, w.y));
+            float detail = 1.0 - smoothstep(0.65, 1.80, max(w.x, w.y));
             pane = mix(cover, pane, detail);
             winMask = pane * body;
             float r = h21(cell + vSeed * 0.137);
@@ -321,9 +321,9 @@ export class City {
         // In daylight a window is a faint cool reflection, not a dark hole:
         // a strong tint here turned every facade into checkered noise. After
         // dark the glass goes properly black behind the lit panes.
-        vec3 glass = mix(diffuseColor.rgb * 0.88 + vec3(0.02, 0.035, 0.05),
-                         diffuseColor.rgb * 0.30 + vec3(0.01, 0.015, 0.03), uNight);
-        diffuseColor.rgb = mix(diffuseColor.rgb, glass, winMask * mix(0.42, 0.92, uNight));
+        vec3 glass = mix(diffuseColor.rgb * 0.70 + vec3(0.03, 0.055, 0.085),
+                         diffuseColor.rgb * 0.26 + vec3(0.01, 0.015, 0.03), uNight);
+        diffuseColor.rgb = mix(diffuseColor.rgb, glass, winMask * mix(0.80, 0.94, uNight));
         totalEmissiveRadiance += winGlow;`)
           .replace('#include <dithering_fragment>',
         `#include <dithering_fragment>
