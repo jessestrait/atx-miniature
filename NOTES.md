@@ -160,9 +160,27 @@ carries only the year and the growth and goes to both materials, so a
 half-risen building still casts the right shadow; the facade varyings go to
 the visible material alone.
 
-Two habits this argues for. **Read the console on the deployed page, not only
-the dev server** — this survived several local checks. And **force a recompile
-when you want to know if a shader is healthy**: set `needsUpdate` on every
-material, drop the shadow map, render once, and count what `console.error`
-catches. A browser console panel keeps old entries across navigations, so a
-stale error and a live one look identical.
+Three habits this argues for.
+
+- **Read the console on the deployed page**, not only the dev server. This
+  survived several local checks.
+- **Force a recompile when you want to know if a shader is healthy.** Set
+  `needsUpdate` on every material, drop the shadow map, render once, and count
+  what `console.error` catches. A browser console panel keeps old entries
+  across navigations, so a stale error and a live one look identical.
+- **Check that the page is running the code you just shipped.** After the fix
+  was deployed the error persisted, and it was a cached `city.js`: reloading
+  the HTML does not re-fetch an ES module the browser still considers fresh,
+  and a query string on the page URL does not change the module URLs. The tell
+  is to compare what is loaded against a fresh fetch:
+
+```js
+const fresh = await (await fetch('src/city.js?bust=' + Date.now())).text();
+mesh.customDepthMaterial.onBeforeCompile.toString().includes('vWNrm')   // loaded
+  && fresh.includes('growPatch')                                        // shipped
+// both true means you are looking at a stale module, not a live bug
+```
+
+  GitHub Pages serves assets with a ten minute max-age. If a deploy ever needs
+  to be picked up immediately, add a version query to the imports rather than
+  chasing a ghost.

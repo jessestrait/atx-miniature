@@ -123,6 +123,11 @@ In the order I would actually do them.
 - **Depth of field needs a tight camera clip range.** It is tracked to the shot
   each frame in `src/main.js`. If you widen `near`/`far`, the blur pass loses
   its depth precision and the whole frame goes soft.
+- **After deploying, check you are running what you shipped.** GitHub Pages
+  caches assets for ten minutes and a reload will not re-fetch an ES module the
+  browser still thinks is fresh, so a fixed bug can appear to persist. Compare
+  the loaded module against a `fetch(..., {cache:'reload'})`; NOTES has the
+  one-liner.
 
 ## Where it runs
 
