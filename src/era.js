@@ -51,3 +51,45 @@ export function trafficAt(year) {
     buses: THREE.MathUtils.clamp((year - 1940) / 20, 0, 1),
   };
 }
+
+/* ---------------------------------------------------------------- daylight
+ * The hour of the day, as light rather than as a clock. Sun elevation peaks
+ * at 13:00 and the sky runs from a cold dawn through white noon to a low warm
+ * evening and then out. `night` is the blend that switches the city on: it
+ * starts to rise before the sun is actually down, because windows come on at
+ * dusk, not at darkness. */
+const DAY = [
+  { h: 4.0,  sky: '#1d2740', sun: '#3f5378', amb: '#141d33', I: 0.16, A: 0.46, night: 1.00 },
+  { h: 6.2,  sky: '#5d6a86', sun: '#c98d6a', amb: '#3a4560', I: 0.55, A: 0.55, night: 0.72 },
+  { h: 7.5,  sky: '#b9bfc4', sun: '#ffd0a0', amb: '#8a8f9a', I: 1.45, A: 0.80, night: 0.28 },
+  { h: 10.0, sky: '#d9e0e4', sun: '#fff0dc', amb: '#a8b0b8', I: 2.25, A: 0.95, night: 0.02 },
+  { h: 13.0, sky: '#e4e8e6', sun: '#fff8ee', amb: '#b2b6b4', I: 2.55, A: 1.00, night: 0.00 },
+  { h: 16.5, sky: '#e2ddd0', sun: '#ffeed4', amb: '#aca69a', I: 2.20, A: 0.95, night: 0.03 },
+  { h: 18.6, sky: '#dcc0a2', sun: '#ffc384', amb: '#8f7f72', I: 1.35, A: 0.78, night: 0.34 },
+  { h: 19.8, sky: '#9c7f83', sun: '#e2794f', amb: '#584c56', I: 0.62, A: 0.55, night: 0.72 },
+  { h: 21.0, sky: '#33405e', sun: '#5a6a92', amb: '#1e2740', I: 0.24, A: 0.50, night: 0.96 },
+  { h: 24.0, sky: '#1d2740', sun: '#3f5378', amb: '#141d33', I: 0.16, A: 0.46, night: 1.00 },
+];
+for (const d of DAY) { d.cSky = new THREE.Color(d.sky); d.cSun = new THREE.Color(d.sun); d.cAmb = new THREE.Color(d.amb); }
+
+const dayOut = { cSky: new THREE.Color(), cSun: new THREE.Color(), cAmb: new THREE.Color(),
+                 I: 1, A: 1, night: 0, elev: 0, azim: 0 };
+export function dayAt(hour) {
+  const h = THREE.MathUtils.clamp(hour, DAY[0].h, 24);
+  let i = 0;
+  while (i < DAY.length - 2 && DAY[i + 1].h < h) i++;
+  const a = DAY[i], b = DAY[i + 1];
+  const t = THREE.MathUtils.clamp((h - a.h) / (b.h - a.h), 0, 1), s = t * t * (3 - 2 * t);
+  dayOut.cSky.copy(a.cSky).lerp(b.cSky, s);
+  dayOut.cSun.copy(a.cSun).lerp(b.cSun, s);
+  dayOut.cAmb.copy(a.cAmb).lerp(b.cAmb, s);
+  dayOut.I = a.I + (b.I - a.I) * s;
+  dayOut.A = a.A + (b.A - a.A) * s;
+  dayOut.night = a.night + (b.night - a.night) * s;
+  // The sun tracks east to west and peaks at 13:00; below the horizon it is
+  // held just above so the moonlight still has a direction to come from.
+  const dayT = THREE.MathUtils.clamp((h - 6.4) / (19.4 - 6.4), 0, 1);
+  dayOut.elev = Math.max(0.10, Math.sin(dayT * Math.PI) * 1.02) * (Math.PI / 2) * 0.62;
+  dayOut.azim = (-0.62 + dayT * 2.4);
+  return dayOut;
+}

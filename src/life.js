@@ -9,9 +9,16 @@ import { trafficAt } from './era.js';
  * scale of zero rather than being removed, so no buffer ever regrows. */
 
 const LANE = { motorway: 4.5, trunk: 3.6, primary: 3.2, secondary: 2.8, tertiary: 2.4, street: 1.8 };
-const CAR_COLORS = ['#d9d4cb','#2e3338','#8d939a','#7c2f2a','#243a52','#5d6b56','#b8b2a6','#3d4550','#94553a','#c9c2b4'];
-const HORSE_COLORS = ['#4a3b2e','#5c4a38','#33291f','#6b5642'];
-const PED_COLORS = ['#3a4550','#5d4a3c','#2f3b33','#6b5a48','#44404d','#7a6a58','#39424b'];
+/* Vehicles and people are deliberately oversized. At model scale a true 4.4 m
+ * car is two pixels and the streets read as empty, so they are scaled the way
+ * a tabletop layout scales its figures: big enough to see, small enough to
+ * still look like traffic. */
+const VEHICLE_SCALE = 1.75, PED_SCALE = 2.6;
+const CAR_COLORS = ['#e8443c','#f0a12c','#2f7fd4','#f2e04a','#e8ede8','#38b06a','#2a2f38','#d8562c',
+                    '#7a4ecc','#26b4c4','#f07ab0','#c9ced6','#8a5a34','#1f4f9c'];
+const HORSE_COLORS = ['#6b4a2e','#4a3320','#8a6642','#3a2a1c'];
+const PED_COLORS = ['#e05a4a','#3f7fd0','#f0b93c','#3aa864','#d44e94','#8a5ad0','#28c0c4','#f07a3a',
+                    '#e8e2d4','#2f3742','#c94f4f','#4fb0e0','#f2d24a','#5a8f3a'];
 
 const ROAD_HALF = { motorway: 9, trunk: 7, primary: 6.5, secondary: 5.5, tertiary: 4.5, street: 3.5, service: 1.7, path: .9 };
 
@@ -159,31 +166,69 @@ class Pool {
 }
 
 export class Life {
+  /** One material for every vehicle: instance colour paints the body, and the
+   *  aEmit class turns the light boxes into emitters after dark. */
+  vehicleMaterial(u) {
+    const m = new THREE.MeshStandardMaterial({ roughness: .45, metalness: .06 });
+    m.onBeforeCompile = sh => {
+      sh.uniforms.uNight = u.uNight;
+      sh.vertexShader = 'attribute float aEmit;\n varying float vEmit;\n'
+        + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n vEmit = aEmit;');
+      sh.fragmentShader = 'uniform float uNight;\n varying float vEmit;\n'
+        + sh.fragmentShader.replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
+        if (vEmit > 0.5) {
+          vec3 lampCol = vEmit < 1.5 ? vec3(1.0, 0.94, 0.78)
+                       : vEmit < 2.5 ? vec3(1.0, 0.22, 0.14)
+                       :               vec3(1.0, 0.78, 0.30);
+          diffuseColor.rgb = mix(diffuseColor.rgb, lampCol, 0.85);
+          totalEmissiveRadiance += lampCol * uNight * (vEmit < 1.5 ? 2.6 : 1.7);
+        }`);
+    };
+    return m;
+  }
+
   constructor(model, city, opts = {}) {
     this.city = city;
+    const uniforms = opts.uniforms || { uNight: { value: 0 } };
+    this.u = uniforms;
     this.group = new THREE.Group();
     const density = opts.density ?? 1;
     const drive = buildPaths(model, city, true);
     const trails = buildPaths(model, city, false).filter(p => p.cls === 'path');
     const walk = buildSidewalks(model, city).concat(trails);
 
-    // --- cars: a body with a slightly narrower cabin on top
-    const carGeo = boxCluster([[0, .75, 0, 2.0, 1.5, 4.4], [0, 1.75, -.25, 1.7, .95, 2.3]]);
-    this.cars = new Pool(carGeo, new THREE.MeshStandardMaterial({ roughness: .45, metalness: .15 }),
-                         Math.round(620 * density), drive, { lift: .9, lane: 1 });
+    const V = VEHICLE_SCALE;
+    // --- cars: body, cabin, then two headlights and two tail lights flagged
+    //     emissive so they come on with the night without a second mesh
+    const carGeo = boxCluster([
+      [0, .78 * V, 0, 2.0 * V, 1.5 * V, 4.5 * V],
+      [0, 1.80 * V, -.20 * V, 1.66 * V, 1.0 * V, 2.3 * V],
+      [-.62 * V, .82 * V, 2.28 * V, .52 * V, .42 * V, .12 * V, 1],
+      [ .62 * V, .82 * V, 2.28 * V, .52 * V, .42 * V, .12 * V, 1],
+      [-.66 * V, .92 * V, -2.28 * V, .44 * V, .30 * V, .12 * V, 2],
+      [ .66 * V, .92 * V, -2.28 * V, .44 * V, .30 * V, .12 * V, 2],
+    ]);
+    this.cars = new Pool(carGeo, this.vehicleMaterial(uniforms), Math.round(620 * density), drive, { lift: .9, lane: 1 });
     this.cars.setColors(i => CAR_COLORS[Math.floor(hash(i * 4.4) * CAR_COLORS.length)]);
     this.group.add(this.cars.mesh);
 
-    // --- horse traffic: a small dark cart, used before the cars take over
-    const horseGeo = boxCluster([[0, .7, .4, 1.3, 1.1, 2.4], [0, .85, -1.2, .7, 1.3, 1.5]]);
-    this.horses = new Pool(horseGeo, new THREE.MeshStandardMaterial({ roughness: .9 }),
-                           Math.round(260 * density), drive, { lift: .8, lane: .9, bob: .05 });
+    // --- horse traffic: cart and animal, with a lantern at the front
+    const horseGeo = boxCluster([
+      [0, .72 * V, .45 * V, 1.35 * V, 1.15 * V, 2.4 * V],
+      [0, .90 * V, -1.25 * V, .78 * V, 1.35 * V, 1.6 * V],
+      [0, 1.30 * V, 1.62 * V, .26 * V, .30 * V, .24 * V, 1],
+    ]);
+    this.horses = new Pool(horseGeo, this.vehicleMaterial(uniforms), Math.round(260 * density), drive, { lift: .8, lane: .9, bob: .05 });
     this.horses.setColors(i => HORSE_COLORS[Math.floor(hash(i * 6.2) * HORSE_COLORS.length)]);
     this.group.add(this.horses.mesh);
 
-    // --- pedestrians: a capsule, bobbing as it walks
-    const pedGeo = new THREE.CapsuleGeometry(.34, 1.05, 3, 6); pedGeo.translate(0, .86, 0);
-    this.peds = new Pool(pedGeo, new THREE.MeshStandardMaterial({ roughness: .9 }),
+    // --- pedestrians: a capsule with a paler head, bobbing as it walks
+    const P = PED_SCALE;
+    const pedGeo = mergeSimple([
+      (() => { const g = new THREE.CapsuleGeometry(.34 * P, 1.00 * P, 3, 7); g.translate(0, .84 * P, 0); g.deleteAttribute('uv'); return g; })(),
+      (() => { const g = new THREE.SphereGeometry(.30 * P, 7, 5); g.translate(0, 1.66 * P, 0); g.deleteAttribute('uv'); return g; })(),
+    ]);
+    this.peds = new Pool(pedGeo, new THREE.MeshStandardMaterial({ roughness: .85 }),
                          Math.round(1500 * density), walk.length > 20 ? walk : drive, { lift: .5, lane: 0, bob: .09 });
     this.peds.setColors(i => PED_COLORS[Math.floor(hash(i * 8.8) * PED_COLORS.length)]);
     this.group.add(this.peds.mesh);
@@ -202,8 +247,15 @@ export class Life {
       paths.push({ pts, cum, L, year: 1940, cls: 'bus', lane: 1.6, weight: 1, color: r.color });
     }
     if (!paths.length) { this.buses = null; return; }
-    const geo = boxCluster([[0, 1.6, 0, 2.7, 3.0, 12.0], [0, 3.15, .4, 2.4, .35, 10.6]]);
-    this.buses = new Pool(geo, new THREE.MeshStandardMaterial({ roughness: .5 }),
+    const V = VEHICLE_SCALE;
+    const geo = boxCluster([
+      [0, 1.65 * V, 0, 2.7 * V, 3.1 * V, 11.6 * V],
+      [0, 3.25 * V, .4 * V, 2.4 * V, .36 * V, 10.2 * V],
+      [0, 2.35 * V, -5.84 * V, 2.1 * V, 1.5 * V, .1 * V, 3],
+      [-.88 * V, .95 * V, 5.84 * V, .66 * V, .48 * V, .1 * V, 1],
+      [ .88 * V, .95 * V, 5.84 * V, .66 * V, .48 * V, .1 * V, 1],
+    ]);
+    this.buses = new Pool(geo, this.vehicleMaterial(this.u),
                           Math.min(90, paths.length), paths, { lift: 1.0, lane: 1 });
     this.buses.setColors(i => this.buses.items[i].p.color || '#2f6fb0');
     this.group.add(this.buses.mesh);
@@ -223,10 +275,14 @@ export class Life {
   }
 }
 
-/** Merge a few boxes into one geometry: [x,y,z,w,h,d] each. */
+/** Merge a few boxes into one geometry: [x, y, z, w, h, d, emitClass?].
+ *  emitClass 0 body, 1 headlight, 2 tail light, 3 destination sign. */
 function boxCluster(specs) {
-  const parts = specs.map(([x, y, z, w, h, d]) => {
-    const g = new THREE.BoxGeometry(w, h, d); g.translate(x, y, z); g.deleteAttribute('uv'); return g;
+  const parts = specs.map(([x, y, z, w, h, d, emit = 0]) => {
+    const g = new THREE.BoxGeometry(w, h, d); g.translate(x, y, z); g.deleteAttribute('uv');
+    const n = g.attributes.position.count;
+    g.setAttribute('aEmit', new THREE.BufferAttribute(new Float32Array(n).fill(emit), 1));
+    return g;
   });
   const out = mergeSimple(parts);
   parts.forEach(p => p.dispose());
@@ -235,17 +291,21 @@ function boxCluster(specs) {
 function mergeSimple(geos) {
   let vc = 0, ic = 0;
   geos.forEach(g => { vc += g.attributes.position.count; ic += g.index.count; });
+  const hasEmit = geos.some(g => g.attributes.aEmit);
   const pos = new Float32Array(vc * 3), nor = new Float32Array(vc * 3), idx = new Uint16Array(ic);
+  const emit = hasEmit ? new Float32Array(vc) : null;
   let vo = 0, io = 0;
   for (const g of geos) {
     pos.set(g.attributes.position.array, vo * 3);
     nor.set(g.attributes.normal.array, vo * 3);
+    if (emit && g.attributes.aEmit) emit.set(g.attributes.aEmit.array, vo);
     for (let i = 0; i < g.index.count; i++) idx[io + i] = g.index.array[i] + vo;
     vo += g.attributes.position.count; io += g.index.count;
   }
   const out = new THREE.BufferGeometry();
   out.setAttribute('position', new THREE.BufferAttribute(pos, 3));
   out.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
+  if (emit) out.setAttribute('aEmit', new THREE.BufferAttribute(emit, 1));
   out.setIndex(new THREE.BufferAttribute(idx, 1));
   return out;
 }

@@ -6,10 +6,12 @@ import { BokehPass } from 'three/addons/postprocessing/BokehPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { HorizontalTiltShiftShader } from 'three/addons/shaders/HorizontalTiltShiftShader.js';
 import { VerticalTiltShiftShader } from 'three/addons/shaders/VerticalTiltShiftShader.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { City, makeUniforms } from './city.js';
 import { Life } from './life.js';
+import { makeLamps, makeTrees } from './props.js';
 import { Rig } from './camera.js';
-import { eraAt, FIRST_YEAR, LAST_YEAR } from './era.js';
+import { eraAt, dayAt, FIRST_YEAR, LAST_YEAR } from './era.js';
 
 const $ = id => document.getElementById(id);
 const Q = new URLSearchParams(location.search);
@@ -34,8 +36,12 @@ const uniforms = makeUniforms();
 const model = await (await fetch(Q.get('model') || 'data/downtown.json')).json();
 const city = new City(model, uniforms, 1.6);
 scene.add(city.group);
-const life = new Life(model, city, { density: Q.has('light') ? .45 : 1 });
+const life = new Life(model, city, { density: Q.has('light') ? .45 : 1, uniforms });
 scene.add(life.group);
+const lamps = makeLamps(model, city, { max: Q.has('light') ? 1400 : 3200 });
+if (lamps) scene.add(lamps.group);
+const trees = makeTrees(model, city, { max: Q.has('light') ? 3500 : 9000 });
+if (trees) scene.add(trees.group);
 
 const rig = new Rig(canvas, city.halfW, city.halfH);
 let camera = rig.setMode('mini');
@@ -69,13 +75,17 @@ const GradeShader = {
       gl_FragColor = c;
     }`
 };
-let composer, bokeh, hTilt, vTilt, grade;
+let composer, bloom, bokeh, hTilt, vTilt, grade;
 function makeComposer() {
   const s = renderer.getSize(new THREE.Vector2()).multiplyScalar(renderer.getPixelRatio());
   const rt = new THREE.WebGLRenderTarget(Math.max(2, s.x), Math.max(2, s.y), { type: THREE.HalfFloatType, samples: 4 });
   if (composer) composer.dispose();
   composer = new EffectComposer(renderer, rt);
   composer.addPass(new RenderPass(scene, camera));
+  // Bloom only earns its place after dark: it is what makes a lit window read
+  // as a light rather than as a pale square.
+  bloom = new UnrealBloomPass(new THREE.Vector2(Math.max(2, s.x), Math.max(2, s.y)), 0.0, 0.42, 0.85);
+  composer.addPass(bloom);
   bokeh = new BokehPass(scene, camera, { focus: 2000, aperture: 3e-5, maxblur: .012 });
   composer.addPass(bokeh);
   hTilt = new ShaderPass(HorizontalTiltShiftShader); vTilt = new ShaderPass(VerticalTiltShiftShader);
@@ -107,12 +117,23 @@ function setQuality(q) {
 }
 setQuality(Q.has('light') ? 2048 : 4096);
 
+let night = 0;
 function setSun() {
-  const az = $('sun').value * Math.PI / 180, el = 48 * Math.PI / 180, R = 5000;
-  sun.position.set(Math.sin(az) * Math.cos(el) * R, Math.sin(el) * R, Math.cos(az) * Math.cos(el) * R);
+  const hour = +$('sun').value;
+  const d = dayAt(hour);
+  night = d.night;
+  uniforms.uNight.value = night;
+  const R = 5200;
+  sun.position.set(Math.sin(d.azim) * Math.cos(d.elev) * R, Math.sin(d.elev) * R, Math.cos(d.azim) * Math.cos(d.elev) * R);
+  sun.intensity = d.I; hemi.intensity = d.A;
   const s = sun.shadow.camera, span = Math.max(city.halfW, city.halfH) * 1.5;
-  s.left = -span; s.right = span; s.top = span; s.bottom = -span; s.near = 500; s.far = 11000;
+  s.left = -span; s.right = span; s.top = span; s.bottom = -span; s.near = 500; s.far = 12000;
   s.updateProjectionMatrix();
+  if (bloom) { bloom.strength = 0.05 + night * 0.38; bloom.radius = 0.35 + night * 0.18; }
+  renderer.toneMappingExposure = 1.05 - night * 0.22;
+  const h = Math.floor(hour) % 24, m = Math.round((hour % 1) * 60);
+  $('sunLabel').textContent = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+  syncYear();
 }
 
 function frame() {
@@ -123,6 +144,7 @@ function frame() {
 }
 
 // ---------------------------------------------------------------- timeline
+const _sky = new THREE.Color();
 let timeline = false, playing = false, year = YMAX, rate = 10;   // years per second
 let revealT = 1;
 
@@ -141,14 +163,23 @@ function syncYear() {
   const y = Math.round(year);
   $('yrLabel').textContent = y;
   const e = eraAt(timeline ? year : LAST_YEAR);
+  const d = dayAt(+$('sun').value);
   $('eraLabel').textContent = timeline ? e.label : '';
-  scene.background = e.cSky;
-  sun.color.copy(e.cSun); hemi.color.copy(e.cSky); hemi.groundColor.copy(e.cAmb);
+  // The hour sets the light; the era tints it. After dark the era tint gives
+  // way, because a period look is a daylight effect.
+  const dayW = 1 - d.night;
+  _sky.copy(d.cSky).lerp(e.cSky, dayW * 0.45);
+  scene.background = _sky;
+  sun.color.copy(d.cSun).lerp(e.cSun, dayW * 0.5);
+  hemi.color.copy(_sky); hemi.groundColor.copy(d.cAmb).lerp(e.cAmb, dayW * 0.5);
   if (grade) {
-    grade.uniforms.sat.value = e.sat; grade.uniforms.vig.value = e.vig;
-    grade.uniforms.warm.value = e.warm; grade.uniforms.haze.value = e.haze;
-    grade.uniforms.hazeCol.value.copy(e.cSky);
+    grade.uniforms.sat.value = e.sat * (1 - d.night * 0.22) + d.night * 0.1;
+    grade.uniforms.vig.value = e.vig + d.night * 0.14;
+    grade.uniforms.warm.value = e.warm * dayW;
+    grade.uniforms.haze.value = e.haze * dayW;
+    grade.uniforms.hazeCol.value.copy(_sky);
   }
+  if (lamps) lamps.update(d.night, year, timeline);
   if (timeline) {
     const n = model.buildings.filter(b => b.y <= year).length;
     $('count').textContent = `${n.toLocaleString()} standing`;
@@ -168,6 +199,8 @@ $('play').onclick = () => { if (!timeline) setTimeline(true); else { playing = !
 $('speed').oninput = () => { rate = +$('speed').value; $('speedLabel').textContent = rate + ' yr/s'; };
 $('replay').onclick = () => { if (timeline) { year = RUN_START; playing = true; $('play').textContent = '❚❚'; syncYear(); } else revealT = 0; };
 $('life').onchange = () => life.setVisible($('life').checked);
+$('windows').onchange = () => { uniforms.uWindows.value = $('windows').checked ? 1 : 0; };
+$('trees').onchange = () => { if (trees) trees.group.visible = $('trees').checked; };
 $('frameAll').onclick = () => rig.frameAll();
 
 canvas.addEventListener('dblclick', ev => {
@@ -179,6 +212,7 @@ addEventListener('keydown', e => {
   if (e.code === 'Space') { e.preventDefault(); $('play').click(); }
   if (e.key === 'h' || e.key === 'H') $('ui').classList.toggle('hidden');
   if (e.key === 't' || e.key === 'T') setTimeline(!timeline);
+  if (e.key === 'n' || e.key === 'N') { $('sun').value = night > .5 ? 10.5 : 21.4; setSun(); }
 });
 addEventListener('resize', frame);
 
@@ -240,6 +274,11 @@ function tick(now) {
     uniforms.uReveal.value = revealT;
   }
 
+  uniforms.uTime.value = now / 1000;
+  // The warm flash marks a building going up, so it belongs to a run in
+  // motion. Parked at the last year it would leave every recent tower glowing.
+  const wantFlash = timeline && playing ? 0.85 : 0;
+  uniforms.uFlash.value += (wantFlash - uniforms.uFlash.value) * Math.min(1, dt * 3.5);
   rig.controls.autoRotate = $('orbit').checked;
   rig.update(dt);
   if (life.group.visible) life.update(dt, year, timeline);

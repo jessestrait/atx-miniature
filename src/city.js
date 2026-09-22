@@ -2,10 +2,10 @@ import * as THREE from 'three';
 import * as BGU from 'three/addons/utils/BufferGeometryUtils.js';
 
 export const PALETTE = {
-  ground: '#d6cdae', groundHi: '#c9bf9c', park: '#9dbb74', water: '#5c9fbf',
-  slab: '#b5a98d', slabSide: '#a89c80',
-  road: { motorway: '#6d6660', trunk: '#736c66', primary: '#7c756e', secondary: '#878079', tertiary: '#918a83',
-          street: '#9c958d', service: '#b0a9a0', path: '#d8cdb3', rail: '#4d4641' },
+  ground: '#dfd6b4', groundHi: '#cfc79c', park: '#7fc05c', water: '#3fa8d8',
+  slab: '#c2b493', slabSide: '#b3a486',
+  road: { motorway: '#5f5a58', trunk: '#69635f', primary: '#726c67', secondary: '#7e7872', tertiary: '#8a847d',
+          street: '#968f88', service: '#aaa49b', path: '#e0cfa8', rail: '#463f3a' },
   low:   ['#f1e8d6','#e9dcc6','#e2cfb0','#dcbf9f','#cfc7a9','#e6d8cb','#d9c6b8','#efe2c9'],
   mid:   ['#d8d0c2','#cbc6bc','#bfbbb3','#e1d7c9','#c8bfb0'],
   tower: ['#93b6cb','#a9c5d4','#84a7bd','#b8ccd8','#9fb9c6','#c2d3dc'],
@@ -16,16 +16,16 @@ export const PALETTE = {
  * glass. Using one skyscraper palette for both put a curtain wall on the
  * Norwood Tower in 1929, which is what gave this away. */
 const ERA_PALETTE = [
-  { until: 1900, low: ['#e3d3bb','#d8c3a6','#cbb89f','#dfd0b4','#c9b294','#d5c6ae'],
-                 mid: ['#d2bfa4','#c7b498','#dccbb0'], tower: ['#c9b194','#d6c3a5','#bfa88c'] },
-  { until: 1945, low: ['#e8dcc6','#d9bfa6','#c9a289','#dcc7ad','#cbb9a2','#e3d6bf','#bf9f86'],
-                 mid: ['#d6c3a8','#c8b199','#ddd0ba','#c3a892'], tower: ['#cdb69a','#dac6a9','#c0a88f','#d5c0a2'] },
-  { until: 1975, low: ['#ded8cb','#d2ccc0','#e4ded1','#cfc6b6','#d8cfc0'],
-                 mid: ['#d3cec4','#c6c1b7','#dcd6c9'], tower: ['#c8c6bd','#d5d2c8','#bcb9b0','#cfccc2'] },
-  { until: 2000, low: ['#dcd6cc','#cfcac1','#e0dad0','#c8c2b8'],
-                 mid: ['#c9c6bf','#d6d2ca','#bdb9b2'], tower: ['#b3bcc0','#c2c9cc','#a7b1b6','#c9ced0'] },
-  { until: 9999, low: ['#e4ded4','#d7d1c7','#eae4da','#cfcabf'],
-                 mid: ['#cfd2d2','#dcdedc','#c2c6c7'], tower: ['#93b6cb','#a9c5d4','#84a7bd','#b8ccd8','#9fb9c6','#c2d3dc'] },
+  { until: 1900, low: ['#e0c9a2','#d8ab86','#c99a72','#e6d3ad','#c98f6e','#d9bd95','#bf8f6a'],
+                 mid: ['#d3ab84','#c79370','#e0c6a0'], tower: ['#cf9f78','#dcb98f','#c08d68'] },
+  { until: 1945, low: ['#edd9b4','#e0a889','#cf7f68','#dcbf9a','#c9a184','#efdcb8','#b8705c','#d9b07e'],
+                 mid: ['#dcae83','#c98f6e','#e8cfa4','#c4906f'], tower: ['#d6a87c','#e2be8d','#c4906d','#dcb489'] },
+  { until: 1975, low: ['#e8e2cf','#cfd8c4','#efe4cd','#d4c6a8','#b8ccbd','#e6cfc0','#ccd4dc'],
+                 mid: ['#d8d2c0','#c2ccc4','#e4dcc8'], tower: ['#cfcdbe','#dcd8c8','#bcc4c0','#d4cfc2'] },
+  { until: 2000, low: ['#dcd6c8','#c9cdc4','#e4dcce','#c2bcae','#cfd2cd'],
+                 mid: ['#c9c9c0','#d6d6cc','#bcbcb2'], tower: ['#a8bcc4','#bcccd2','#98aeb8','#c6d2d4'] },
+  { until: 9999, low: ['#ece4d6','#dcd4c4','#f2ece0','#cfcabc','#d8ddd6'],
+                 mid: ['#cdd6d8','#dee4e2','#bfc8cb'], tower: ['#7fb4d2','#9cc8de','#6fa4c4','#b2d0e0','#8cb8cc','#c0dae8'] },
 ];
 export function eraPalette(year, kind) {
   for (const e of ERA_PALETTE) if (year <= e.until) return e[kind];
@@ -40,7 +40,11 @@ export function hash(n) { const x = Math.sin(n * 127.1 + 311.7) * 43758.5453; re
 /** Shared uniforms: uYear drives every reveal, uReveal is the 0..1 wipe used
  *  by the non-timeline "pop-up" intro. */
 export function makeUniforms() {
-  return { uYear: { value: 2026 }, uReveal: { value: 1 }, uMode: { value: 0 } };
+  return {
+    uYear: { value: 2026 }, uReveal: { value: 1 }, uMode: { value: 0 },
+    uNight: { value: 0 }, uTime: { value: 0 }, uWindows: { value: 1 }, uFlash: { value: 0 },
+    uLampCol: { value: new THREE.Color('#ffc978') },
+  };
 }
 
 export class City {
@@ -201,26 +205,33 @@ export class City {
       const pal = eraPalette(b.y || 1960, b.k);
       tmp.set(pal[Math.floor(hash(bi) * pal.length)]).offsetHSL(0, 0, (hash(bi + 7) - .5) * .06);
       const n = g.attributes.position.count;
-      const col = new Float32Array(n * 3), del = new Float32Array(n), bas = new Float32Array(n), yr = new Float32Array(n), inf = new Float32Array(n);
+      const col = new Float32Array(n * 3), del = new Float32Array(n), bas = new Float32Array(n),
+            yr = new Float32Array(n), top = new Float32Array(n), sd = new Float32Array(n);
       const d = Math.hypot(b.cx || 0, b.cy || 0) / this.maxR;
       const delay = 1.6 + d * 5.2 + hash(bi + 3) * .5 + (b.k === 'tower' ? .4 : 0);
+      const topY = this.y(b.z) + b.h;
       for (let i = 0; i < n; i++) {
         col[i*3] = tmp.r; col[i*3+1] = tmp.g; col[i*3+2] = tmp.b;
-        del[i] = delay; bas[i] = baseY; yr[i] = b.y || 1900; inf[i] = b.ys === 2 ? 1 : 0;
+        del[i] = delay; bas[i] = baseY; yr[i] = b.y || 1900; top[i] = topY; sd[i] = bi;
       }
       g.setAttribute('color', new THREE.BufferAttribute(col, 3));
       g.setAttribute('aDelay', new THREE.BufferAttribute(del, 1));
       g.setAttribute('aBase', new THREE.BufferAttribute(bas, 1));
       g.setAttribute('aYear', new THREE.BufferAttribute(yr, 1));
-      g.setAttribute('aInferred', new THREE.BufferAttribute(inf, 1));
+      g.setAttribute('aTop', new THREE.BufferAttribute(top, 1));
+      g.setAttribute('aSeed', new THREE.BufferAttribute(sd, 1));
       geos.push(g);
     });
     const g = BGU.mergeGeometries(geos);
     const u = this.u;
     const patch = sh => {
       sh.uniforms.uYear = u.uYear; sh.uniforms.uReveal = u.uReveal; sh.uniforms.uMode = u.uMode;
-      sh.vertexShader = 'uniform float uYear, uReveal, uMode; attribute float aDelay, aBase, aYear, aInferred;\n varying float vNew;\n'
-        + sh.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
+      sh.vertexShader = `uniform float uYear, uReveal, uMode;
+        attribute float aDelay, aBase, aYear, aTop, aSeed;
+        varying float vNew, vTop, vSeed, vBase;
+        varying vec3 vWPos, vWNrm;\n`
+        + sh.vertexShader
+          .replace('#include <begin_vertex>', `#include <begin_vertex>
           float g;
           if (uMode > 0.5) {
             g = clamp((uYear - aYear) / 1.1, 0.0, 1.0);
@@ -231,15 +242,92 @@ export class City {
           }
           float gm = g - 1.0;
           g = g <= 0.0 ? 0.0 : 1.0 + 2.2 * gm * gm * gm + 1.2 * gm * gm;
-          transformed.y = aBase + (transformed.y - aBase) * g;`);
+          transformed.y = aBase + (transformed.y - aBase) * g;
+          vTop = aTop; vSeed = aSeed; vBase = aBase;`)
+          .replace('#include <project_vertex>', `#include <project_vertex>
+          vWPos = (modelMatrix * vec4(transformed, 1.0)).xyz;
+          vWNrm = normalize(mat3(modelMatrix) * objectNormal);`);
     };
-    const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: .85, flatShading: true });
+    const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: .78, flatShading: true });
     mat.onBeforeCompile = sh => {
       patch(sh);
-      // a building flashes warm for a few years after it goes up
-      sh.fragmentShader = 'varying float vNew;\n' + sh.fragmentShader.replace(
-        '#include <dithering_fragment>',
-        '#include <dithering_fragment>\n gl_FragColor.rgb += vec3(0.55, 0.33, 0.10) * vNew * vNew * 0.8;');
+      sh.uniforms.uNight = u.uNight;
+      sh.uniforms.uTime = u.uTime;
+      sh.uniforms.uFlash = u.uFlash;
+      sh.uniforms.uWindows = u.uWindows;
+      sh.uniforms.uLampCol = u.uLampCol;
+      /* Windows are generated in the fragment shader from world position, not
+       * from a texture: the facade coordinate is the wall's own tangent, so a
+       * grid of panes wraps every elevation of every building with no UVs and
+       * no extra geometry. At night a per-pane hash decides which are lit, and
+       * a slow term lets a few switch over while you watch. */
+      sh.fragmentShader = `uniform float uNight, uTime, uWindows, uFlash;
+        uniform vec3 uLampCol;
+        varying float vNew, vTop, vSeed, vBase;
+        varying vec3 vWPos, vWNrm;
+        float h21(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }\n`
+        + sh.fragmentShader
+          .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
+        vec3 winGlow = vec3(0.0);
+        float winMask = 0.0;
+        if (uWindows > 0.5) {
+          vec3 N = normalize(vWNrm);
+          if (abs(N.y) < 0.62) {
+            // a coordinate that runs along the wall, and one that runs up it
+            vec3 tan3 = normalize(cross(vec3(0.0, 1.0, 0.0), N));
+            float u1 = dot(vWPos.xz, tan3.xz);
+            float v1 = vWPos.y - vBase;
+            // Chunky panes on purpose. A true 3 m window grid aliases into
+            // static at model distance; grouping it into bays that survive
+            // the shrink is what a model maker does too.
+            float floorH = 5.0, colW = 5.4;
+            float seedOff = h21(vec2(vSeed, 3.0));
+            float fy = (v1 - 2.9) / floorH;
+            float fx = (u1 / colW) + seedOff * 3.0;
+            // don't glaze the plinth or run panes off the parapet
+            float body = step(3.4, v1) * (1.0 - step(vTop - vBase - 1.1, v1));
+            vec2 cell = vec2(floor(fx), floor(fy));
+            vec2 f = vec2(fract(fx), fract(fy));
+            // Antialias the pane edges against their own screen-space
+            // derivative, and dissolve the whole grid to its average once a
+            // cell is smaller than a pixel, so distance fades rather than
+            // shimmers.
+            vec2 w = vec2(fwidth(fx), fwidth(fy)) * 0.9 + 1e-5;
+            vec2 lo = vec2(0.24, 0.26), hi = vec2(0.76, 0.74);
+            vec2 pa = smoothstep(lo - w, lo + w, f) * (1.0 - smoothstep(hi - w, hi + w, f));
+            float pane = pa.x * pa.y;
+            float cover = (hi.x - lo.x) * (hi.y - lo.y);
+            float detail = 1.0 - smoothstep(0.18, 0.55, max(w.x, w.y));
+            pane = mix(cover, pane, detail);
+            winMask = pane * body;
+            float r = h21(cell + vSeed * 0.137);
+            // a slow drift so a few windows change over while you watch
+            float flick = step(0.5, fract(r * 7.3 + uTime * 0.035 + h21(cell.yx) * 3.0));
+            // Roughly a third of panes are lit, and a small building is not an
+            // office tower: its share drops with its height.
+            float occupancy = mix(0.22, 0.46, clamp((vTop - vBase) / 55.0, 0.0, 1.0));
+            float lit = step(1.0 - occupancy, r) * mix(1.0, flick, 0.35);
+            // not every window is the same lamp: mostly tungsten, some
+            // cold office fluorescent, a few screens and a little neon
+            float tint = h21(cell + 11.0);
+            vec3 warm = uLampCol;
+            warm = mix(warm, vec3(0.78, 0.88, 1.00), step(0.62, tint));
+            warm = mix(warm, vec3(0.55, 0.78, 1.00), step(0.82, tint));
+            warm = mix(warm, vec3(1.00, 0.55, 0.42), step(0.92, tint));
+            warm = mix(warm, vec3(0.52, 1.00, 0.76), step(0.975, tint));
+            winGlow = warm * winMask * lit * uNight * 0.85;
+          }
+        }
+        // In daylight a window is a faint cool reflection, not a dark hole:
+        // a strong tint here turned every facade into checkered noise. After
+        // dark the glass goes properly black behind the lit panes.
+        vec3 glass = mix(diffuseColor.rgb * 0.88 + vec3(0.02, 0.035, 0.05),
+                         diffuseColor.rgb * 0.30 + vec3(0.01, 0.015, 0.03), uNight);
+        diffuseColor.rgb = mix(diffuseColor.rgb, glass, winMask * mix(0.42, 0.92, uNight));
+        totalEmissiveRadiance += winGlow;`)
+          .replace('#include <dithering_fragment>',
+        `#include <dithering_fragment>
+        gl_FragColor.rgb += vec3(0.62, 0.36, 0.11) * vNew * vNew * uFlash;`);
     };
     const mesh = new THREE.Mesh(g, mat);
     mesh.customDepthMaterial = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking });

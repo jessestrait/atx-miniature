@@ -75,9 +75,12 @@
   </div>
 
   <div class="row"><label>Blur</label><input id="blur" type="range" min="0" max="100" value="55"></div>
-  <div class="row"><label>Sun</label><input id="sun" type="range" min="0" max="360" value="215"></div>
+  <div class="row"><label>Time</label><input id="sun" type="range" min="4" max="24" step="0.1" value="10.5">
+    <span id="sunLabel" style="font-size:11px;color:var(--dim);width:38px;text-align:right">10:30</span></div>
   <div class="row">
     <label style="flex:0 0 auto">Life</label><input id="life" type="checkbox" checked>
+    <label style="flex:0 0 auto">Lit</label><input id="windows" type="checkbox" checked>
+    <label style="flex:0 0 auto">Trees</label><input id="trees" type="checkbox" checked>
     <label style="flex:0 0 auto">Orbit</label><input id="orbit" type="checkbox">
     <button id="frameAll" style="margin-left:auto">Frame</button>
     <button id="replay">↻</button>
