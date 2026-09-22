@@ -20,6 +20,9 @@ Started 2026-09-22 as a side project of [ATX Layers](https://jessestrait.com/atx
 Its own repo on purpose: every commit to `jessestrait.github.io` rebuilds the
 Pages site.
 
+**Live:** <https://jessestrait.github.io/atx-miniature/>
+**Picking this up on another machine?** Read [HANDOFF.md](HANDOFF.md) first.
+
 ## Run it
 
 ```
