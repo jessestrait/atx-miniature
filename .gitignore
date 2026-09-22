@@ -1,0 +1,6 @@
+.DS_Store
+.claude/
+# TCAD ships ~600 MB of CSV; tools/tcad_years.py rebuilds pid_year.json from it
+data/tcad/*.csv
+data/tcad/*.zip
+data/tiles/
