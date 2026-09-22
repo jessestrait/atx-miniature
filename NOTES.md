@@ -139,3 +139,30 @@ buildings in one draw call, 5,938 trees, 1,178 lamps, 620 cars, 1,500 people.
 
 Note that a hidden browser tab stops `requestAnimationFrame` entirely, so any
 frame-rate measurement taken while the page is not visible reads zero.
+
+## The shadow-depth material has no normals
+
+Found only after deploying, by reading the console on the live page.
+
+The building growth term and the window varyings were injected by one shared
+`onBeforeCompile`, used for both the visible material and the
+`customDepthMaterial` that draws the shadow pass. `MeshDepthMaterial` never
+includes `<beginnormal_vertex>`, so `objectNormal` does not exist in its
+shader, and the depth program failed to compile:
+
+```
+ERROR: 0:487: 'objectNormal' : undeclared identifier
+```
+
+A failed depth program is close to silent — the scene still renders, you just
+quietly lose every building's shadow. The patch is now split: `growPatch`
+carries only the year and the growth and goes to both materials, so a
+half-risen building still casts the right shadow; the facade varyings go to
+the visible material alone.
+
+Two habits this argues for. **Read the console on the deployed page, not only
+the dev server** — this survived several local checks. And **force a recompile
+when you want to know if a shader is healthy**: set `needsUpdate` on every
+material, drop the shadow map, render once, and count what `console.error`
+catches. A browser console panel keeps old entries across navigations, so a
+stale error and a live one look identical.

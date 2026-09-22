@@ -224,25 +224,34 @@ export class City {
     });
     const g = BGU.mergeGeometries(geos);
     const u = this.u;
-    const patch = sh => {
+    /* The growth term is shared by the visible material and the shadow-depth
+     * material, so both agree on where a half-risen building is. The facade
+     * varyings are NOT shared: MeshDepthMaterial never includes
+     * <beginnormal_vertex>, so `objectNormal` does not exist in its shader and
+     * injecting the window coordinates there fails to compile the depth
+     * program, which silently costs you every building's shadow. */
+    const growPatch = sh => {
       sh.uniforms.uYear = u.uYear; sh.uniforms.uReveal = u.uReveal; sh.uniforms.uMode = u.uMode;
       sh.vertexShader = `uniform float uYear, uReveal, uMode;
-        attribute float aDelay, aBase, aYear, aTop, aSeed;
-        varying float vNew, vTop, vSeed, vBase;
-        varying vec3 vWPos, vWNrm;\n`
+        attribute float aDelay, aBase, aYear;\n`
         + sh.vertexShader
           .replace('#include <begin_vertex>', `#include <begin_vertex>
           float g;
-          if (uMode > 0.5) {
-            g = clamp((uYear - aYear) / 1.1, 0.0, 1.0);
-            vNew = 1.0 - clamp((uYear - aYear) / 4.0, 0.0, 1.0);
-          } else {
-            g = clamp((uReveal * 9.0 - aDelay) / 0.7, 0.0, 1.0);
-            vNew = 0.0;
-          }
+          if (uMode > 0.5) g = clamp((uYear - aYear) / 1.1, 0.0, 1.0);
+          else             g = clamp((uReveal * 9.0 - aDelay) / 0.7, 0.0, 1.0);
           float gm = g - 1.0;
           g = g <= 0.0 ? 0.0 : 1.0 + 2.2 * gm * gm * gm + 1.2 * gm * gm;
-          transformed.y = aBase + (transformed.y - aBase) * g;
+          transformed.y = aBase + (transformed.y - aBase) * g;`);
+    };
+    const patch = sh => {
+      growPatch(sh);
+      sh.vertexShader = `attribute float aTop, aSeed;
+        varying float vNew, vTop, vSeed, vBase;
+        varying vec3 vWPos, vWNrm;\n`
+        + sh.vertexShader
+          .replace('transformed.y = aBase + (transformed.y - aBase) * g;',
+            `transformed.y = aBase + (transformed.y - aBase) * g;
+          vNew = uMode > 0.5 ? 1.0 - clamp((uYear - aYear) / 4.0, 0.0, 1.0) : 0.0;
           vTop = aTop; vSeed = aSeed; vBase = aBase;`)
           .replace('#include <project_vertex>', `#include <project_vertex>
           vWPos = (modelMatrix * vec4(transformed, 1.0)).xyz;
@@ -331,7 +340,7 @@ export class City {
     };
     const mesh = new THREE.Mesh(g, mat);
     mesh.customDepthMaterial = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking });
-    mesh.customDepthMaterial.onBeforeCompile = patch;
+    mesh.customDepthMaterial.onBeforeCompile = growPatch;
     mesh.castShadow = true; mesh.receiveShadow = true;
     this.group.add(mesh);
     this.buildingMesh = mesh;
