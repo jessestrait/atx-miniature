@@ -283,9 +283,46 @@ $('rec').onclick = () => {
 
 makeComposer(); setSun(); markView(); frame(); syncYear();
 setTimeline(Q.has('pop') ? false : true);
+
+/* Deep links. `?year=1935&hour=19.4&ui=hidden&view=iso` opens on that shot,
+ * which is how the site's thumbnail is captured and how you send someone a
+ * particular moment rather than the front door. */
+if (Q.has('year')) {
+  const y = THREE.MathUtils.clamp(parseFloat(Q.get('year')), YMIN, YMAX);
+  if (Number.isFinite(y)) { year = y; $('yr').value = y; playing = false; $('play').textContent = '▶'; syncYear(); }
+}
+if (Q.has('hour')) {
+  const h = THREE.MathUtils.clamp(parseFloat(Q.get('hour')), 4, 24);
+  if (Number.isFinite(h)) { $('sun').value = h; setSun(); }
+}
+if (Q.get('view') === 'iso') $('viewIso').click();
+if (Q.has('blur')) $('blur').value = THREE.MathUtils.clamp(parseFloat(Q.get('blur')) || 0, 0, 100), applyBlur();
+if (Q.has('ui')) {
+  const want = Q.get('ui');
+  // `none` also drops the restore button: for a screenshot or an embed where
+  // the page is the picture and nothing should sit on top of it.
+  setPanel(['full', 'mini', 'hidden', 'none'].includes(want) ? (want === 'none' ? 'hidden' : want) : 'full');
+  if (want === 'none') $('show').style.display = 'none';
+}
+if (Q.has('orbit')) { $('orbit').checked = Q.get('orbit') !== '0'; }
+if (Q.has('cam')) {
+  // cam=x,y,z,tx,ty,tz in model metres, for reproducing an exact shot
+  const n = Q.get('cam').split(',').map(Number);
+  if (n.length === 6 && n.every(Number.isFinite)) {
+    rig.camera.position.set(n[0], n[1], n[2]);
+    rig.controls.target.set(n[3], n[4], n[5]);
+    rig.controls.update();
+  }
+}
 $('load').classList.add('gone');
 
-window.atx = { scene, city, life, rig, model, uniforms, renderer, lamps, trees, get year() { return year; }, set year(v) { year = v; $('yr').value = v; syncYear(); } };
+/** Print a deep link to whatever is on screen right now. */
+function shotLink() {
+  const c = rig.camera.position, t = rig.controls.target, r = v => Math.round(v);
+  return `${location.origin}${location.pathname}?year=${Math.round(year)}&hour=${(+$('sun').value).toFixed(1)}`
+       + `&blur=${$('blur').value}&ui=hidden&cam=${r(c.x)},${r(c.y)},${r(c.z)},${r(t.x)},${r(t.y)},${r(t.z)}`;
+}
+window.atx = { scene, city, life, rig, model, uniforms, renderer, lamps, trees, shotLink, get year() { return year; }, set year(v) { year = v; $('yr').value = v; syncYear(); } };
 
 // ---------------------------------------------------------------- loop
 let last = performance.now(), acc = 0, fps = 60;

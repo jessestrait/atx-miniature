@@ -64,9 +64,26 @@ covered a third of an iPhone screen, and the choice is remembered.
 and bearing together, with the sky, the exposure and the bloom. **Lit** toggles
 the window shader and **Trees** the planting.
 
-`?model=data/other.json` loads a different slice, `?light` halves the traffic,
-the lamps, the trees and the shadow map, `?pop` opens on the pop-up reveal
-instead of the timeline.
+### Deep links
+
+The page opens on whatever the URL asks for, so you can send someone a moment
+rather than the front door.
+
+| parameter | |
+|---|---|
+| `year=1935` | open parked on that year |
+| `hour=19.4` | the hour of the day, 4 to 24 |
+| `blur=40` | aperture, 0 to 100 |
+| `view=iso` | open in the isometric view |
+| `ui=mini` | `full`, `mini`, `hidden`, or `none` for no chrome at all |
+| `cam=x,y,z,tx,ty,tz` | an exact camera and target, in model metres |
+| `orbit=1` | start the slow auto-orbit |
+| `light` | halve the traffic, lamps, trees and shadow map |
+| `pop` | open on the pop-up reveal instead of the timeline |
+| `model=data/other.json` | load a different slice |
+
+`atx.shotLink()` in the console prints a link to exactly what is on screen.
+That is how the portfolio thumbnail is captured, with `ui=none`.
 
 ## Rebuild the data
 

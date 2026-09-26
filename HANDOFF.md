@@ -129,6 +129,23 @@ In the order I would actually do them.
   the loaded module against a `fetch(..., {cache:'reload'})`; NOTES has the
   one-liner.
 
+## Capturing a still
+
+`atx.shotLink()` in the console prints a deep link to the current shot. Feed
+that to headless Chrome with `ui=none`:
+
+```bash
+"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
+  --headless=new --use-angle=swiftshader --enable-unsafe-swiftshader \
+  --hide-scrollbars --window-size=1600,900 --virtual-time-budget=25000 \
+  --screenshot=/tmp/shot.png '<the link, with &light>'
+```
+
+Software rendering takes a couple of minutes, so add `&light` and expect to
+wait. There is no `timeout` command on macOS; background the process and poll
+for the file. A daylight hour photographs better than dusk at thumbnail size —
+the lit windows turn to speckle once the image is a few hundred pixels wide.
+
 ## Where it runs
 
 - Locally, `python3 -m http.server 8765`.
