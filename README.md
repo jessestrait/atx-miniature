@@ -45,6 +45,7 @@ Open <http://localhost:8765>. No build step; three.js comes from jsDelivr.
 | `Space` | play / pause the timeline |
 | `T` | timeline vs. pop-up reveal |
 | `N` | jump between midday and night |
+| `C` | collapse the panel to the year and the scrubber |
 | `H` | hide the panel |
 
 **Play the film** runs the whole thing with a single scripted push-in, which is
@@ -54,6 +55,10 @@ the shot worth recording. **Record** does the same and hands back a `.webm`.
 slider is the aperture. **Isometric** is a true 35.264° orthographic view with a
 screen-space tilt-shift band instead, because the bokeh pass's maths is
 perspective-only.
+
+The panel has three states — full, collapsed to the year and the scrubber, and
+hidden behind one small button. A phone opens collapsed, because the full panel
+covered a third of an iPhone screen, and the choice is remembered.
 
 **Time** is the hour of the day, not a compass: it drives the sun's elevation
 and bearing together, with the sky, the exposure and the bloom. **Lit** toggles

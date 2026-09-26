@@ -207,10 +207,44 @@ canvas.addEventListener('dblclick', ev => {
   const p = rig.pickGround(ev, [city.buildingMesh, city.group.children[0]].filter(Boolean));
   if (p) rig.flyTo(p, Math.max(220, camera.position.distanceTo(rig.controls.target) * .45));
 });
+/* Panel states: full, mini (the year, the play button and the scrubber), and
+ * hidden. A phone gets mini by default — the full panel covered a third of an
+ * iPhone screen — and the state is remembered per browser. */
+let lastOpen = 'full';
+function setPanel(state) {
+  const ui = $('ui');
+  ui.classList.toggle('mini', state === 'mini');
+  ui.classList.toggle('hidden', state === 'hidden');
+  $('show').classList.toggle('on', state === 'hidden');
+  const expand = state === 'mini';
+  $('collapse').title = expand ? 'Expand' : 'Collapse';
+  $('collapse').setAttribute('aria-label', expand ? 'Expand the panel' : 'Collapse the panel');
+  if (state !== 'hidden') {
+    // Only full and mini are remembered. Persisting "hidden" would reopen the
+    // page with no visible controls but one small button, which reads as broken.
+    lastOpen = state;
+    try { localStorage.setItem('atxmin.panel', state); } catch (e) { /* private browsing */ }
+  }
+}
+function panelState() {
+  const ui = $('ui');
+  return ui.classList.contains('hidden') ? 'hidden' : ui.classList.contains('mini') ? 'mini' : 'full';
+}
+$('collapse').onclick = () => setPanel(panelState() === 'mini' ? 'full' : 'mini');
+$('hide').onclick = () => setPanel('hidden');
+$('show').onclick = () => setPanel(lastOpen);
+
+let savedPanel = null;
+try { savedPanel = localStorage.getItem('atxmin.panel'); } catch (e) { /* private browsing */ }
+// A phone opens collapsed: the full panel covered a third of an iPhone screen.
+const narrow = matchMedia('(max-width: 620px)').matches || matchMedia('(hover: none)').matches;
+setPanel(savedPanel === 'full' || savedPanel === 'mini' ? savedPanel : (narrow ? 'mini' : 'full'));
+
 addEventListener('keydown', e => {
   if (e.target && /input|textarea|select/i.test(e.target.tagName)) return;
   if (e.code === 'Space') { e.preventDefault(); $('play').click(); }
-  if (e.key === 'h' || e.key === 'H') $('ui').classList.toggle('hidden');
+  if (e.key === 'h' || e.key === 'H') setPanel(panelState() === 'hidden' ? 'full' : 'hidden');
+  if (e.key === 'c' || e.key === 'C') setPanel(panelState() === 'mini' ? 'full' : 'mini');
   if (e.key === 't' || e.key === 'T') setTimeline(!timeline);
   if (e.key === 'n' || e.key === 'N') { $('sun').value = night > .5 ? 10.5 : 21.4; setSun(); }
 });
@@ -220,7 +254,7 @@ function runLength() { return timeline ? (YMAX - RUN_START) / rate + 2.2 : 10; }
 
 /** Start the reveal from the top, with the scripted camera move. */
 function startFilm(hideUi) {
-  if (hideUi) $('ui').classList.add('hidden');
+  if (hideUi) { filmRestore = panelState(); setPanel('hidden'); }
   $('orbit').checked = false;
   if (timeline) { year = RUN_START; playing = true; $('play').textContent = '❚❚'; syncYear(); }
   else revealT = 0;
@@ -228,7 +262,7 @@ function startFilm(hideUi) {
 }
 $('film').onclick = () => startFilm(false);
 
-let recorder = null;
+let recorder = null, filmRestore = null;
 $('rec').onclick = () => {
   if (recorder) { recorder.stop(); return; }
   const type = ['video/webm;codecs=vp9', 'video/webm', 'video/mp4'].find(t => MediaRecorder.isTypeSupported(t));
@@ -239,7 +273,7 @@ $('rec').onclick = () => {
   recorder.onstop = () => {
     $('dl').href = URL.createObjectURL(new Blob(chunks, { type }));
     $('dl').style.display = 'inline'; $('rec').textContent = '● Record'; recorder = null;
-    $('ui').classList.remove('hidden');
+    setPanel(filmRestore || 'full');
   };
   $('rec').textContent = '■ Stop'; $('dl').style.display = 'none';
   startFilm(true);
