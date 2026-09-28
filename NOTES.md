@@ -184,3 +184,46 @@ mesh.customDepthMaterial.onBeforeCompile.toString().includes('vWNrm')   // loade
   GitHub Pages serves assets with a ten minute max-age. If a deploy ever needs
   to be picked up immediately, add a version query to the imports rather than
   chasing a ghost.
+
+## A hidden preview pane makes the canvas lie
+
+Three wrong captures in one session, each diagnosed as a different bug, all
+had the same cause.
+
+`requestAnimationFrame` does not run in a background tab or a hidden preview
+pane, so the render loop stops. The canvas keeps whatever it last drew. A
+`toBlob()` readback then returns a stale frame that looks entirely plausible —
+it is a real render of this model — while being the camera from several minutes
+ago, focused and stopped for a distance the camera no longer sits at.
+
+What it looked like each time, and what it was not:
+
+- **"The capture is framed tighter than the screen."** Not a composer bug. It
+  was the previous shot, still sitting in the canvas.
+- **"`?dpr=2` renders blank."** Not a memory limit. The loop had never run, so
+  nothing had been drawn at the new size.
+- **"The still is blurred end to end."** Not a broken aperture. `applyBlur()`
+  runs per frame from the live camera distance; with no frames it kept the
+  value computed at load, when the camera was still parked far away.
+
+The fix is `renderFrame()` in `main.js` — refresh the lens, draw once, on
+demand — and the rule that anything reading the canvas calls it first.
+
+**The misdiagnosis cost more than the bug.** On the strength of the first
+symptom, `composer.setSize()` was "fixed" to take drawing-buffer pixels. It
+does not: `EffectComposer` applies the renderer's pixel ratio to its own
+targets, so passing it buffer pixels made every render target twice the size it
+should be — 6400x3600 — which is what actually produced the blank frame that
+then got blamed on `?dpr=2`. The original line was right all along. Check what
+a library does with a size before concluding the caller is wrong.
+
+## `?cam=` never worked until it cancelled the fly-in
+
+The deep link set `camera.position` and `controls.target` directly. The page
+opens with `rig.frameAll()`, which leaves a flight running, and the flight
+animated straight over the top of it a frame later. Every `?cam=` link silently
+opened on the default framing.
+
+`Rig.setShot()` now cancels the flight, the film and the inertia before placing
+the camera, and the deep link goes through it. Setting state that something
+else is still animating is not setting state.

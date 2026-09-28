@@ -77,6 +77,7 @@ rather than the front door.
 | `view=iso` | open in the isometric view |
 | `ui=mini` | `full`, `mini`, `hidden`, or `none` for no chrome at all |
 | `cam=x,y,z,tx,ty,tz` | an exact camera and target, in model metres |
+| `dpr=1` | render at one device pixel per CSS pixel, for a slow machine |
 | `orbit=1` | start the slow auto-orbit |
 | `light` | halve the traffic, lamps, trees and shadow map |
 | `pop` | open on the pop-up reveal instead of the timeline |

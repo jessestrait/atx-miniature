@@ -101,6 +101,19 @@ export class Rig {
   }
   stopFilm() { this.film = null; }
 
+  /** Put the camera exactly here, cancelling anything that would move it.
+   *  A deep link that only set position and target lost the shot a frame later,
+   *  because the opening frameAll() leaves a flight running that animates over
+   *  the top of it. Anything that wants an exact shot goes through this. */
+  setShot(px, py, pz, tx, ty, tz) {
+    this.flight = null; this.film = null;
+    this.vel.set(0, 0, 0); this.zoomVel = 0; this.tiltVel = 0;
+    this.controls.target.set(tx, ty, tz);
+    this.camera.position.set(px, py, pz);
+    this.camera.lookAt(this.controls.target);
+    this.controls.update();
+  }
+
   /** Ground point under a screen position, for double-click focus. */
   pickGround(ev, meshes) {
     const r = this.canvas.getBoundingClientRect();

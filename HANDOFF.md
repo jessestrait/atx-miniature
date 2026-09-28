@@ -131,20 +131,40 @@ In the order I would actually do them.
 
 ## Capturing a still
 
-`atx.shotLink()` in the console prints a deep link to the current shot. Feed
-that to headless Chrome with `ui=none`:
+**Do not use headless Chrome for this.** It has no GPU, and SwiftShader renders
+the window grid as dithered mush — the `fwidth` antialiasing in the facade
+shader behaves differently in software. Every still on the site was captured
+from a real GPU canvas instead.
+
+The method: open the page in a browser, then read the canvas back and POST it
+to a tiny local receiver. `tools/recv_canvas.py` is that receiver.
 
 ```bash
-"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
-  --headless=new --use-angle=swiftshader --enable-unsafe-swiftshader \
-  --hide-scrollbars --window-size=1600,900 --virtual-time-budget=25000 \
-  --screenshot=/tmp/shot.png '<the link, with &light>'
+python3 tools/recv_canvas.py /tmp/shot.png        # listens on 127.0.0.1:8799
 ```
 
-Software rendering takes a couple of minutes, so add `&light` and expect to
-wait. There is no `timeout` command on macOS; background the process and poll
-for the file. A daylight hour photographs better than dusk at thumbnail size —
-the lit windows turn to speckle once the image is a few hundred pixels wide.
+Then, in the page's console, with the shot you want on screen:
+
+```js
+atx.renderFrame();                                 // see below — this matters
+const b = await new Promise(r => atx.renderer.domElement.toBlob(r, 'image/png'));
+await fetch('http://127.0.0.1:8799/save', { method: 'POST', body: b });
+```
+
+`atx.shotLink()` prints a deep link to the current shot; open it with `ui=none`
+to capture with no chrome on top. The canvas is at `devicePixelRatio`, so a
+1600x900 window yields a 3200x1800 grab — downsample to 1600x900.
+
+**`atx.renderFrame()` is not optional.** A background tab or a hidden preview
+pane stops `requestAnimationFrame`, so the canvas still holds an older frame
+and the readback silently returns the wrong shot — a camera from minutes ago,
+focused and stopped for wherever it used to be. `renderFrame()` refreshes the
+lens for the current camera and draws once, on demand. Three separate wrong
+captures in one session traced back to this.
+
+A close framing photographs far better than a wide one at card size: a lit pane
+that is smaller than a pixel turns to speckle, and the whole image reads as
+noise rather than a city.
 
 ## Where it runs
 

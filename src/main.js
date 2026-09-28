@@ -19,7 +19,12 @@ const Q = new URLSearchParams(location.search);
 // ---------------------------------------------------------------- renderer
 const canvas = $('c');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, preserveDrawingBuffer: true, powerPreference: 'high-performance' });
-renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+/* EffectComposer applies the renderer's pixel ratio to its own targets, so
+ * composer.setSize() below takes CSS pixels, not drawing-buffer pixels. Pass it
+ * buffer pixels and every target comes out twice the size it should be.
+ * `?dpr=1` drops the cost on a slow machine; `?dpr=2` forces native. */
+const DPR = Math.max(0.5, Math.min(devicePixelRatio, +(Q.get('dpr') || 2) || 2));
+renderer.setPixelRatio(DPR);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -140,7 +145,7 @@ function frame() {
   const w = innerWidth, h = innerHeight;
   renderer.setSize(w, h, false);
   rig.resize(w, h);
-  if (composer) { composer.setSize(w, h); applyBlur(); }
+  if (composer) { composer.setSize(w, h); applyBlur(); }   // CSS pixels: see DPR above
 }
 
 // ---------------------------------------------------------------- timeline
@@ -308,11 +313,7 @@ if (Q.has('orbit')) { $('orbit').checked = Q.get('orbit') !== '0'; }
 if (Q.has('cam')) {
   // cam=x,y,z,tx,ty,tz in model metres, for reproducing an exact shot
   const n = Q.get('cam').split(',').map(Number);
-  if (n.length === 6 && n.every(Number.isFinite)) {
-    rig.camera.position.set(n[0], n[1], n[2]);
-    rig.controls.target.set(n[3], n[4], n[5]);
-    rig.controls.update();
-  }
+  if (n.length === 6 && n.every(Number.isFinite)) rig.setShot(...n);
 }
 $('load').classList.add('gone');
 
@@ -322,7 +323,8 @@ function shotLink() {
   return `${location.origin}${location.pathname}?year=${Math.round(year)}&hour=${(+$('sun').value).toFixed(1)}`
        + `&blur=${$('blur').value}&ui=hidden&cam=${r(c.x)},${r(c.y)},${r(c.z)},${r(t.x)},${r(t.y)},${r(t.z)}`;
 }
-window.atx = { scene, city, life, rig, model, uniforms, renderer, lamps, trees, shotLink, get year() { return year; }, set year(v) { year = v; $('yr').value = v; syncYear(); } };
+window.atx = { scene, city, life, rig, model, uniforms, renderer, lamps, trees, shotLink,
+  get composer() { return composer; }, frame, renderFrame, get year() { return year; }, set year(v) { year = v; $('yr').value = v; syncYear(); } };
 
 // ---------------------------------------------------------------- loop
 let last = performance.now(), acc = 0, fps = 60;
@@ -353,19 +355,30 @@ function tick(now) {
   rig.controls.autoRotate = $('orbit').checked;
   rig.update(dt);
   if (life.group.visible) life.update(dt, year, timeline);
-  if (!rig.isOrtho) {
-    const d = camera.position.distanceTo(rig.controls.target);
-    // Keep the clip range tight around the subject: the depth-of-field pass
-    // reads the depth buffer, and a 5..60000 range leaves it no precision.
-    const near = Math.max(1, d * 0.03), far = Math.max(near + 10, d * 5 + city.maxR);
-    if (Math.abs(camera.near - near) > near * 0.12 || Math.abs(camera.far - far) > far * 0.12) {
-      camera.near = near; camera.far = far; camera.updateProjectionMatrix();
-      bokeh.materialBokeh.uniforms.nearClip.value = near;
-      bokeh.materialBokeh.uniforms.farClip.value = far;
-    }
-    bokeh.uniforms.focus.value = d;
-    applyBlur(d);
-  }
+  syncLens();
   composer.render();
 }
+
+/* Focus, aperture and clip range all follow the camera's distance to its
+ * subject, so they have to be refreshed before any render that matters — not
+ * only inside the loop. A still captured without this is focused and stopped
+ * for wherever the camera was when the page loaded. */
+function syncLens() {
+  if (rig.isOrtho) return;
+  const d = camera.position.distanceTo(rig.controls.target);
+  // Keep the clip range tight around the subject: the depth-of-field pass
+  // reads the depth buffer, and a 5..60000 range leaves it no precision.
+  const near = Math.max(1, d * 0.03), far = Math.max(near + 10, d * 5 + city.maxR);
+  if (Math.abs(camera.near - near) > near * 0.12 || Math.abs(camera.far - far) > far * 0.12) {
+    camera.near = near; camera.far = far; camera.updateProjectionMatrix();
+    bokeh.materialBokeh.uniforms.nearClip.value = near;
+    bokeh.materialBokeh.uniforms.farClip.value = far;
+  }
+  bokeh.uniforms.focus.value = d;
+  applyBlur(d);
+}
+
+/** Draw one correct frame on demand. A background tab or a hidden preview pane
+ *  never runs the loop, so a canvas readback there returns a stale frame. */
+function renderFrame() { syncLens(); composer.render(); }
 requestAnimationFrame(tick);
